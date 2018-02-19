@@ -7,9 +7,25 @@ defmodule Leader do
     { acceptors, replicas } = receive do
       { :bind, acceptors, replicas } -> { acceptors, replicas }
     end
-    state = %{acceptors: acceptors, replicas: replicas, active: false, proposals: %{}, bn: Ballot.init(self())}
-    spawn(Scout, :start, [self(), acceptors, state.bn])
+    state = %{acceptors: acceptors, replicas: replicas, active: false,
+              proposals: %{}, bn: Ballot.init(self()), backoff: 0}
+    backed_off_spawn(state, Scout, [self(), acceptors, state.bn])
     loop(state)
+  end
+
+  def backed_off_spawn(state, component, args) do
+    Process.sleep(state.backoff)
+    pid = case component do
+      Scout ->
+        spawn(Scout, :start, args)
+      Commander ->
+        spawn(Commander, :start, args)
+      _ ->
+        log "Attempted to spawn a component other than Scout or Commander"
+        System.halt
+        self()
+    end
+    pid
   end
 
   def loop(state) do
@@ -17,7 +33,7 @@ defmodule Leader do
       { :propose, slot, cmd } ->
         if not Map.has_key?(state.proposals, slot) do
           if state.active do
-            spawn(Commander, :start, [self(), state.acceptors, state.replicas, {state.bn, slot, cmd}])
+            backed_off_spawn(state, Commander, [self(), state.acceptors, state.replicas, {state.bn, slot, cmd}])
           end
           Map.update!(state, :proposals, &Map.put_new(&1, slot, cmd))
         else
@@ -26,13 +42,13 @@ defmodule Leader do
       { :adopted, bn, votes } ->
         new_proposals = merge_votes(state.proposals, votes)
         for {slot, cmd} <- new_proposals do
-          spawn(Commander, :start, [self(), state.acceptors, state.replicas, {bn, slot, cmd}])
+          backed_off_spawn(state, Commander, [self(), state.acceptors, state.replicas, {bn, slot, cmd}])
         end
         %{state | active: true, proposals: new_proposals}
       { :preempted, higher_bn } ->
         if higher_bn > state.bn do
           new_state = %{state | active: true, bn: Ballot.inc(state.bn)}
-          spawn(Scout, :start, [self(), state.acceptors, new_state.bn])
+          backed_off_spawn(state, Scout, [self(), state.acceptors, new_state.bn])
           new_state
         else
           state
