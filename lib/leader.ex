@@ -8,7 +8,7 @@ defmodule Leader do
       { :bind, acceptors, replicas } -> { acceptors, replicas }
     end
     state = %{acceptors: acceptors, replicas: replicas, active: false, proposals: %{}, bn: Ballot.init(self())}
-    spawn(Scout, :start, [self(), acceptors, state[:bn]])
+    spawn(Scout, :start, [self(), acceptors, state.bn])
     loop(state)
   end
 
@@ -16,22 +16,22 @@ defmodule Leader do
     state = receive do
       { :propose, slot, cmd } ->
         log "Received proposal"
-        if state[:active] do
-          spawn(Commander, :start, [self(), state[:acceptors], state[:replicas], {state[:bn], slot, cmd}])
+        if state.active do
+          spawn(Commander, :start, [self(), state.acceptors, state.replicas, {state.bn, slot, cmd}])
         end
-        Map.put(state, :proposals, Map.put_new(state[:proposals], slot, cmd))
+        Map.put(state, :proposals, Map.put_new(state.proposals, slot, cmd))
       { :adopted, bn, votes } ->
         log "Adoption confirmed, moving to stage 2"
-        new_proposals = merge_votes(state[:proposals], votes)
+        new_proposals = merge_votes(state.proposals, votes)
         for {slot, cmd} <- new_proposals do
-          spawn(Commander, :start, [self(), state[:acceptors], state[:replicas], {state[:bn], slot, cmd}])
+          spawn(Commander, :start, [self(), state.acceptors, state.replicas, {state[:bn], slot, cmd}])
         end
         Map.put(Map.put(state, :active, true), :proposals, new_proposals)
       { :preempted, higher_bn } ->
         log "Preempted, incrementing ballot number"
         if higher_bn > state[:bn] do
-          new_state = %{state | active: true, bn: Ballot.inc(state[:bn])}
-          spawn(Scout, :start, [self(), state[:acceptors], new_state[:bn]])
+          new_state = %{state | active: true, bn: Ballot.inc(state.bn)}
+          spawn(Scout, :start, [self(), state.acceptors, new_state.bn])
           new_state
         else
           state
@@ -67,7 +67,7 @@ defmodule Leader do
   end
 
   def quorum(state) do
-    Enum.count(state[:waiting_for]) < Enum.count(state[:acceptors]) / 2
+    Enum.count(state.waiting_for) < Enum.count(state.acceptors) / 2
   end
 
   def preempt(pid, lid, higher_bn) do
@@ -93,18 +93,18 @@ defmodule Scout do
     state = receive do
       { :accept_rsp, aid, b, votes } ->
         log ["Received phase-1 response from ", Kernel.inspect aid]
-        if b == state[:bn] do
+        if b == state.bn do
           state = Map.update!(state, :votes, &(&1 ++ votes))
           state = Map.update!(state, :waiting_for, &List.delete(&1, aid))
-          log ["Acceptor ", Kernel.inspect(aid), " agrees, waiting for #{Enum.count(state[:waiting_for])}"]
+          log ["Acceptor ", Kernel.inspect(aid), " agrees, waiting for #{Enum.count(state.waiting_for)}"]
           if Leader.quorum(state) do
             log ["Adopted ballot ", Kernel.inspect state[:bn]]
-            send state[:leader], { :adopted, b, votes }
+            send state.leader, { :adopted, b, votes }
             Process.exit(self(), :adopted)
           end
           state
         else
-          Leader.preempt(self(), state[:leader], b)
+          Leader.preempt(self(), state.leader, b)
         end
     end
     loop(state)
@@ -127,18 +127,18 @@ defmodule Commander do
   def loop(state) do
     state = receive do
       { :accepted_rsp, aid, b } ->
-        log ["Received phase-2 response for proposal ", Kernel.inspect state[:proposal]]
-        if b == state[:bn] do
+        log ["Received phase-2 response for proposal ", Kernel.inspect state.proposal]
+        if b == state.bn do
           state = Map.update!(state, :waiting_for, &List.delete(&1, aid))
-          log ["Acceptor ", Kernel.inspect(aid), " agrees, waiting for #{Enum.count(state[:waiting_for])}"]
+          log ["Acceptor ", Kernel.inspect(aid), " agrees, waiting for #{Enum.count(state.waiting_for)}"]
           if Leader.quorum(state) do
-            for r <- state[:replicas], do: send r, { :decision, {state[:slot], state[:cmd]}}
-            log ["Decision agreed on for proposal ", Kernel.inspect state[:proposal]]
+            for r <- state.replicas, do: send r, { :decision, {state.slot, state.cmd}}
+            log ["Decision agreed on for proposal ", Kernel.inspect state.proposal]
             Process.exit(self(), :decision)
           end
           state
         else
-          Leader.preempt(self(), state[:leader], b)
+          Leader.preempt(self(), state.leader, b)
         end
     end
     loop(state)

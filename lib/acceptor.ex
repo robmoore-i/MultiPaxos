@@ -7,7 +7,6 @@ defmodule Acceptor do
     # Note: Due to interesting elixir overloading, INTEGER > TUPLE is always false,
     #       therefore an integer (like 0) acts as "bottom" for our purposes.
     state = %{bn: 0, accepted: []}
-    log "Initialised"
     loop(state)
   end
 
@@ -15,13 +14,13 @@ defmodule Acceptor do
     new_state = receive do
       { :accept_req, l, b } ->
         log ["Received phase-1 request from ", Kernel.inspect l]
-        max_ballot = max_int(b, state[:bn])
-        send l, { :accept_rsp, self(), max_ballot, state[:accepted] }
+        max_ballot = max_int(b, state.bn)
+        send l, { :accept_rsp, self(), max_ballot, state.accepted }
         Map.put(state, :bn, max_ballot)
       { :accepted_req, l, { b, slot, cmd }} ->
         log ["Received phase-2 request from ", Kernel.inspect l]
-        send l, { :accepted_rsp, self(), state[:bn] }
-        if b == state[:bn] do
+        send l, { :accepted_rsp, self(), state.bn }
+        if b == state.bn do
           Map.update!(state, :accepted, &([{b, slot, cmd} | &1]))
         else
           state

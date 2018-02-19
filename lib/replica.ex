@@ -32,9 +32,9 @@ defmodule Replica do
   end
 
   def unify(state) do
-    sn        = state[:sn]
-    decisions = state[:decisions]
-    proposals = state[:proposals]
+    sn        = state.sn
+    decisions = state.decisions
+    proposals = state.proposals
     if sn in Map.keys(decisions) do
       if sn in Map.keys(proposals) do
         if decisions[sn] != proposals[sn] do
@@ -60,18 +60,18 @@ defmodule Replica do
   end
 
   def propose(state) do
-    pn = state[:pn]
-    if pn < state[:sn] + state[:window] and !Enum.empty?(state[:requests]) do
-      earliest_cmd = state[:decisions][pn - state[:window]]
+    pn = state.pn
+    if pn < state.sn + state.window and !Enum.empty?(state.requests) do
+      earliest_cmd = state.decisions[pn - state.window]
       if Cmd.is_reconfigure(earliest_cmd) do
         log "Reconfiguration received (SHOULDN'T HAPPEN)"
         state = Map.put(state, :leaders, Cmd.pull_new_leaders earliest_cmd)
       end
-      if !Map.has_key?(state[:decisions], pn) do
-        proposed = List.first state[:requests]
+      if !Map.has_key?(state.decisions, pn) do
+        proposed = List.first state.requests
         state = Map.update!(state, :proposals, &Map.put(&1, pn, proposed))
         log ["Proposing #{pn} -> ", Kernel.inspect proposed]
-        for l <- state[:leaders] do
+        for l <- state.leaders do
           send l, { :propose, pn, proposed }
         end
         state = Map.update!(state, :requests, &List.delete_at(&1, 0))
