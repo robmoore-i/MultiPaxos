@@ -3,7 +3,7 @@ defmodule Leader do
     IO.puts ["LEADER   (", Kernel.inspect(self()), "): ", msg]
   end
 
-  def start(config) do
+  def start(_config) do
     { acceptors, replicas } = receive do
       { :bind, acceptors, replicas } -> { acceptors, replicas }
     end
@@ -22,9 +22,9 @@ defmodule Leader do
       { :adopted, bn, votes } ->
         new_proposals = merge_votes(state.proposals, votes)
         for {slot, cmd} <- new_proposals do
-          spawn(Commander, :start, [self(), state.acceptors, state.replicas, {state[:bn], slot, cmd}])
+          spawn(Commander, :start, [self(), state.acceptors, state.replicas, {bn, slot, cmd}])
         end
-        Map.put(Map.put(state, :active, true), :proposals, new_proposals)
+        %{state | active: true, proposals: new_proposals}
       { :preempted, higher_bn } ->
         if higher_bn > state[:bn] do
           new_state = %{state | active: true, bn: Ballot.inc(state.bn)}
@@ -40,7 +40,6 @@ defmodule Leader do
   # Returns updates proposals
   def merge_votes(proposals, votes) do
     # Get the (slot, cmd) pairs which have the maximal ballot number within the given votes
-    acc = %{}
     max_slot_votes = Enum.reduce(votes, %{},
       fn {bn, slot, cmd}, acc ->
         if Map.has_key?(acc, slot) do

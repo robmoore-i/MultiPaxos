@@ -3,7 +3,7 @@ defmodule Acceptor do
     IO.puts ["ACCEPTOR (", Kernel.inspect(self()), "): ", msg]
   end
 
-  def start(config) do
+  def start(_config) do
     # Note: Due to interesting elixir overloading, INTEGER > TUPLE is always false,
     #       therefore an integer (like 0) acts as "bottom" for our purposes.
     state = %{bn: 0, accepted: []}
