@@ -8,24 +8,9 @@ defmodule Leader do
       { :bind, acceptors, replicas } -> { acceptors, replicas }
     end
     state = %{acceptors: acceptors, replicas: replicas, active: false,
-              proposals: %{}, bn: Ballot.init(self()), backoff: 0}
+              proposals: %{}, bn: Ballot.init(self()), backoff: 5}
     backed_off_spawn(state, Scout, [self(), acceptors, state.bn])
     loop(state)
-  end
-
-  def backed_off_spawn(state, component, args) do
-    Process.sleep(state.backoff)
-    pid = case component do
-      Scout ->
-        spawn(Scout, :start, args)
-      Commander ->
-        spawn(Commander, :start, args)
-      _ ->
-        log "Attempted to spawn a component other than Scout or Commander"
-        System.halt
-        self()
-    end
-    pid
   end
 
   def loop(state) do
@@ -44,10 +29,10 @@ defmodule Leader do
         for {slot, cmd} <- new_proposals do
           backed_off_spawn(state, Commander, [self(), state.acceptors, state.replicas, {bn, slot, cmd}])
         end
-        %{state | active: true, proposals: new_proposals}
+        dec_backoff %{state | active: true, proposals: new_proposals}
       { :preempted, higher_bn } ->
         if higher_bn > state.bn do
-          new_state = %{state | active: true, bn: Ballot.inc(state.bn)}
+          new_state = inc_backoff %{state | active: true, bn: Ballot.inc(state.bn)}
           backed_off_spawn(state, Scout, [self(), state.acceptors, new_state.bn])
           new_state
         else
@@ -81,6 +66,38 @@ defmodule Leader do
         Map.put(acc, slot, cmd)
       end)
   end
+
+  ### Implements a multiplicative increase, additive decrease backoff (MIAD)
+  ### minimum backoff is 1 (so that the MI can actually apply)
+
+  def backed_off_spawn(state, component, args) do
+    Process.sleep(state.backoff)
+    pid = case component do
+      Scout ->
+        spawn(Scout, :start, args)
+      Commander ->
+        spawn(Commander, :start, args)
+      _ ->
+        log "Attempted to spawn a component other than Scout or Commander"
+        System.halt
+        self()
+    end
+    pid
+  end
+
+  def inc_backoff(state) do
+    Map.update!(state, :backoff, &(&1 * 2))
+  end
+
+  def dec_backoff(state) do
+    if state.backoff > 5 do
+      Map.update!(state, :backoff, &(&1 - 5))
+    else
+      Map.put(state, :backoff, 1)
+    end
+  end
+
+  ### Some functions used by the subprocesses
 
   def quorum(state) do
     Enum.count(state.waiting_for) < Enum.count(state.acceptors) / 2
