@@ -1,26 +1,35 @@
 defmodule Leader do
+  def log(msg) do
+    IO.puts ["LEADER   (", Kernel.inspect(self()), "): ", msg]
+  end
+
   def start(config) do
     { acceptors, replicas } = receive do
       { :bind, acceptors, replicas } -> { acceptors, replicas }
     end
     state = %{acceptors: acceptors, replicas: replicas, active: false, proposals: %{}, bn: Ballot.init(self())}
+    log ["replicas : ", Kernel.inspect replicas]
+    log ["acceptors: ", Kernel.inspect acceptors]
     loop(state)
   end
 
   def loop(state) do
     state = receive do
       { :propose, slot, cmd } ->
+        log "Received proposal"
         if state[:active] do
           spawn(Commander, :start, [self(), state[:acceptors], state[:replicas], {state[:bn], slot, cmd}])
         end
         Map.put(state, :proposals, Map.put_new(state[:proposals], slot, cmd))
       { :adopted, bn, votes } ->
+        log "Adoption confirmed, moving to stage 2"
         new_proposals = merge_votes(state[:proposals], votes)
         for {slot, cmd} <- new_proposals do
           spawn(Commander, :start, [self(), state[:acceptors], state[:replicas], {state[:bn], slot, cmd}])
         end
         Map.put(Map.put(state, :active, true), :proposals, new_proposals)
       { :preempted, higher_bn } ->
+        log "Preempted, incrementing ballot number"
         if higher_bn > state[:bn] do
           new_state = %{state | active: true, bn: Ballot.inc(state[:bn])}
           spawn(Scout, :start, [self(), state[:acceptors], new_state[:bn]])
@@ -70,8 +79,13 @@ defmodule Leader do
 end
 
 defmodule Scout do
+  def log(msg) do
+    IO.puts ["SCOUT    (", Kernel.inspect(self()), "): ", msg]
+  end
+
   def start(lid, acceptors, bn) do
     state = %{leader: lid, acceptors: acceptors, bn: bn, waiting_for: acceptors, votes: [], quorum: Enum.count(acceptors) / 2}
+    log "sending phase-1 requests for slot #{slot}"
     for a <- acceptors, do: send a, { :accept_req, self(), bn }
     loop(state)
   end
@@ -79,6 +93,7 @@ defmodule Scout do
   def loop(state) do
     state = receive do
       { :accept_rsp, aid, b, votes } ->
+        log "received phase-1 response for slot #{slot}"
         if b == state[:bn] do
           state = Map.update!(state, :votes, &(&1 ++ votes))
           state = Map.update!(state, :acceptors, &List.delete(&1, aid))
@@ -96,8 +111,13 @@ defmodule Scout do
 end
 
 defmodule Commander do
+  def log(msg) do
+    IO.puts ["COMMANDER(", Kernel.inspect(self()), "): ", msg]
+  end
+
   def start(lid, acceptors, replicas, {bn, slot, cmd}) do
     state = %{leader: lid, acceptors: acceptors, bn: bn, slot: slot, cmd: cmd, waiting_for: acceptors, votes: []}
+    log "sending phase-2 requests for slot #{slot}"
     for a <- acceptors, do: send a, { :accepted_req, self(), bn }
     loop(state)
   end
@@ -105,6 +125,7 @@ defmodule Commander do
   def loop(state) do
     state = receive do
       { :accepted_rsp, aid, b } ->
+        log "received phase-2 response for slot #{slot}"
         if b == state[:bn] do
           state = Map.update!(state, :acceptors, &List.delete(&1, aid))
           if Leader.quorum(state) do
