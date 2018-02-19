@@ -31,22 +31,20 @@ defmodule Replica do
   end
 
   def unify(state) do
-    sn        = state.sn
-    decisions = state.decisions
-    proposals = state.proposals
-    if Map.has_key?(decisions, sn) do
+    sn = state.sn
+    if Map.has_key?(state.decisions, sn) do
     state =
-        if Map.has_key?(proposals, sn) do
+        if Map.has_key?(state.proposals, sn) do
           del_proposal = fn s, n -> Map.update!(s, :proposals, &Map.delete(&1, n)) end
-          if decisions[sn] != proposals[sn] do
-            del_proposal.(Map.update!(state, :requests, &([proposals[sn] | &1])), sn)
+          if state.decisions[sn] != state.proposals[sn] do
+            del_proposal.(Map.update!(state, :requests, &([state.proposals[sn] | &1])), sn)
           else
             del_proposal.(state, sn)
           end
         else
           state
         end
-      unify(perform(state, decisions[sn])) # Loop
+      unify(perform(state, state.decisions[sn])) # Loop
     else
       state
     end
@@ -66,10 +64,10 @@ defmodule Replica do
 
   def propose(state) do
     pn = state.pn
-    if pn < state.sn + state.window and  not Enum.empty?(state.requests) do
-      earliest_cmd = state.decisions[pn - state.window]
-      if Cmd.is_reconfigure(earliest_cmd) do
-        # Add leaders using reconfiguration: state = Map.put(state, :leaders, Cmd.pull_new_leaders earliest_cmd)
+    if pn < state.sn + state.window and not Enum.empty?(state.requests) do
+      if Cmd.is_reconfigure(state.decisions[pn - state.window]) do
+        # Add leaders using reconfiguration:
+        #   state = Map.put(state, :leaders, Cmd.pull_new_leaders state.decisions[pn - state.window])
         log "Reconfiguration branch entered erroneously: Replica.propose"
         System.halt
       end
@@ -80,7 +78,8 @@ defmodule Replica do
             send l, { :propose, pn, proposed }
           end
           state = Map.update!(state, :proposals, &Map.put(&1, pn, proposed))
-          Map.update!(state, :requests,  &List.delete_at(&1, 0))
+          state = Map.update!(state, :requests,  &List.delete_at(&1, 0))
+          state
         else
           state
         end

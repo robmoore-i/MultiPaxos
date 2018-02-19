@@ -4,8 +4,8 @@ defmodule Acceptor do
   end
 
   def start(_config) do
-    # Note: Due to interesting elixir overloading, INTEGER > TUPLE is always false,
-    #       therefore an integer (like 0) acts as "bottom" for our purposes.
+    # Note: Due to interesting elixir overloading, TUPLE > INTEGER is always true,
+    #       therefore an integer (like 0) can act as "bottom" for our purposes.
     state = %{bn: 0, accepted: []}
     loop(state)
   end
@@ -27,6 +27,7 @@ defmodule Acceptor do
     loop(new_state)
   end
 
+  # kmt
   def max_int(a, b) do
     if a > b do
       a

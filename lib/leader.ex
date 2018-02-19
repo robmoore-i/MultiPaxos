@@ -15,10 +15,14 @@ defmodule Leader do
   def loop(state) do
     state = receive do
       { :propose, slot, cmd } ->
-        if state.active do
-          spawn(Commander, :start, [self(), state.acceptors, state.replicas, {state.bn, slot, cmd}])
+        if not Map.has_key?(state.proposals, slot) do
+          if state.active do
+            spawn(Commander, :start, [self(), state.acceptors, state.replicas, {state.bn, slot, cmd}])
+          end
+          Map.update!(state, :proposals, &Map.put_new(&1, slot, cmd))
+        else
+          state
         end
-        Map.put(state, :proposals, Map.put_new(state.proposals, slot, cmd))
       { :adopted, bn, votes } ->
         new_proposals = merge_votes(state.proposals, votes)
         for {slot, cmd} <- new_proposals do
@@ -26,7 +30,7 @@ defmodule Leader do
         end
         %{state | active: true, proposals: new_proposals}
       { :preempted, higher_bn } ->
-        if higher_bn > state[:bn] do
+        if higher_bn > state.bn do
           new_state = %{state | active: true, bn: Ballot.inc(state.bn)}
           spawn(Scout, :start, [self(), state.acceptors, new_state.bn])
           new_state
@@ -79,7 +83,8 @@ defmodule Scout do
   end
 
   def start(lid, acceptors, bn) do
-    state = %{leader: lid, acceptors: acceptors, bn: bn, waiting_for: acceptors, votes: [], quorum: Enum.count(acceptors) / 2}
+    state = %{leader: lid, acceptors: acceptors, bn: bn, waiting_for: acceptors,
+              votes: [], quorum: Enum.count(acceptors) / 2}
     for a <- acceptors, do: send a, { :accept_req, self(), bn }
     loop(state)
   end
@@ -88,10 +93,10 @@ defmodule Scout do
     state = receive do
       { :accept_rsp, aid, b, votes } ->
         if b == state.bn do
-          state = Map.update!(state, :votes, &(&1 ++ votes))
+          state = Map.update!(state, :votes,       &(&1 ++ votes))
           state = Map.update!(state, :waiting_for, &List.delete(&1, aid))
           if Leader.quorum(state) do
-            send state.leader, { :adopted, b, votes }
+            send state.leader, { :adopted, state.bn, state.votes }
             Process.exit(self(), :adopted)
           end
           state
@@ -110,7 +115,8 @@ defmodule Commander do
 
   def start(lid, acceptors, replicas, {bn, slot, cmd} = proposal) do
     state = %{leader: lid, acceptors: acceptors, replicas: replicas,
-              bn: bn, slot: slot, cmd: cmd, waiting_for: acceptors, votes: [], proposal: proposal}
+              bn: bn, slot: slot, cmd: cmd, waiting_for: acceptors, votes: [],
+              proposal: proposal}
     for a <- acceptors, do: send a, { :accepted_req, self(),  proposal }
     loop(state)
   end
