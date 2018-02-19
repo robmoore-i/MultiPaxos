@@ -20,7 +20,6 @@ defmodule Replica do
         # There are lots of these: log "Client request"
         Map.update!(state , :requests, &([cmd | &1]))
       { :decision, decision } ->
-        log "Decision recieved"
         process_decision(state, decision)
     end
     state = propose(state)
@@ -52,7 +51,6 @@ defmodule Replica do
   def perform(state, cmd) do
     decisions = state[:decisions]
     if Enum.empty? Enum.filter(Map.keys(decisions), &(state[:sn] > &1 and decisions[&1] == cmd and Cmd.is_reconfigure cmd)) do
-      log "Executing decision"
       _result = Cmd.execute(cmd, state[:db])
       # To send response back to client: ((( send Cmd.client(cmd), { :client_response, Cmd.id cmd, result } )))
     end
@@ -64,13 +62,13 @@ defmodule Replica do
     if pn < state.sn + state.window and !Enum.empty?(state.requests) do
       earliest_cmd = state.decisions[pn - state.window]
       if Cmd.is_reconfigure(earliest_cmd) do
-        log "Reconfiguration received (SHOULDN'T HAPPEN)"
-        state = Map.put(state, :leaders, Cmd.pull_new_leaders earliest_cmd)
+        # Add leaders using reconfiguration, if wanted: state = Map.put(state, :leaders, Cmd.pull_new_leaders earliest_cmd)
+        log "Reconfiguration branch entered erroneously"
+        System.halt
       end
       if !Map.has_key?(state.decisions, pn) do
         proposed = List.first state.requests
         state = Map.update!(state, :proposals, &Map.put(&1, pn, proposed))
-        log ["Proposing #{pn} -> ", Kernel.inspect proposed]
         for l <- state.leaders do
           send l, { :propose, pn, proposed }
         end
