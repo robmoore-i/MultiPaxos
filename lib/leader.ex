@@ -8,8 +8,7 @@ defmodule Leader do
       { :bind, acceptors, replicas } -> { acceptors, replicas }
     end
     state = %{acceptors: acceptors, replicas: replicas, active: false, proposals: %{}, bn: Ballot.init(self())}
-    log ["replicas : ", Kernel.inspect replicas]
-    log ["acceptors: ", Kernel.inspect acceptors]
+    spawn(Scout, :start, [self(), acceptors, state[:bn]])
     loop(state)
   end
 
@@ -85,7 +84,7 @@ defmodule Scout do
 
   def start(lid, acceptors, bn) do
     state = %{leader: lid, acceptors: acceptors, bn: bn, waiting_for: acceptors, votes: [], quorum: Enum.count(acceptors) / 2}
-    log "sending phase-1 requests for slot #{slot}"
+    log ["Sending phase-1 requests for ballot ", Kernel.inspect bn]
     for a <- acceptors, do: send a, { :accept_req, self(), bn }
     loop(state)
   end
@@ -93,17 +92,19 @@ defmodule Scout do
   def loop(state) do
     state = receive do
       { :accept_rsp, aid, b, votes } ->
-        log "received phase-1 response for slot #{slot}"
+        log ["Received phase-1 response from ", Kernel.inspect aid]
         if b == state[:bn] do
           state = Map.update!(state, :votes, &(&1 ++ votes))
-          state = Map.update!(state, :acceptors, &List.delete(&1, aid))
+          state = Map.update!(state, :waiting_for, &List.delete(&1, aid))
+          log ["Acceptor ", Kernel.inspect(aid), " agrees, waiting for #{Enum.count(state[:waiting_for])}"]
           if Leader.quorum(state) do
-            send state[:lid], { :adopted, b, votes }
+            log ["Adopted ballot ", Kernel.inspect state[:bn]]
+            send state[:leader], { :adopted, b, votes }
             Process.exit(self(), :adopted)
           end
           state
         else
-          Leader.preempt(self(), state[:lid], b)
+          Leader.preempt(self(), state[:leader], b)
         end
     end
     loop(state)
@@ -115,26 +116,29 @@ defmodule Commander do
     IO.puts ["COMMANDER(", Kernel.inspect(self()), "): ", msg]
   end
 
-  def start(lid, acceptors, replicas, {bn, slot, cmd}) do
-    state = %{leader: lid, acceptors: acceptors, bn: bn, slot: slot, cmd: cmd, waiting_for: acceptors, votes: []}
-    log "sending phase-2 requests for slot #{slot}"
-    for a <- acceptors, do: send a, { :accepted_req, self(), bn }
+  def start(lid, acceptors, replicas, {bn, slot, cmd} = proposal) do
+    state = %{leader: lid, acceptors: acceptors, replicas: replicas,
+              bn: bn, slot: slot, cmd: cmd, waiting_for: acceptors, votes: [], proposal: proposal}
+    log ["Sending phase-2 requests for proposal ", Kernel.inspect proposal]
+    for a <- acceptors, do: send a, { :accepted_req, self(),  proposal }
     loop(state)
   end
 
   def loop(state) do
     state = receive do
       { :accepted_rsp, aid, b } ->
-        log "received phase-2 response for slot #{slot}"
+        log ["Received phase-2 response for proposal ", Kernel.inspect state[:proposal]]
         if b == state[:bn] do
-          state = Map.update!(state, :acceptors, &List.delete(&1, aid))
+          state = Map.update!(state, :waiting_for, &List.delete(&1, aid))
+          log ["Acceptor ", Kernel.inspect(aid), " agrees, waiting for #{Enum.count(state[:waiting_for])}"]
           if Leader.quorum(state) do
-            for r <- state[:replicas], do: send r, { :decided, {state[:slot], state[:cmd]}}
-            Process.exit(self(), :decided)
+            for r <- state[:replicas], do: send r, { :decision, {state[:slot], state[:cmd]}}
+            log ["Decision agreed on for proposal ", Kernel.inspect state[:proposal]]
+            Process.exit(self(), :decision)
           end
           state
         else
-          Leader.preempt(self(), state[:lid], b)
+          Leader.preempt(self(), state[:leader], b)
         end
     end
     loop(state)

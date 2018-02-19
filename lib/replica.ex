@@ -11,9 +11,6 @@ defmodule Replica do
     # requests is a list of backlogged client requests.
     # proposals maps seq-ns to commands
     # decisions maps slots  to commands
-
-    log ["leaders  : ", Kernel.inspect leaders]
-
     loop(state)
   end
 
@@ -115,7 +112,10 @@ defmodule Cmd do
   end
 
   def execute(cmd, db) do
-    send db, cmd
+    case cmd do
+      {_sender_id, _sequence_number, tx} -> send db, { :execute, tx }
+      _ -> raise ["Bad cmd: ", Kernel.inspect cmd]
+    end
     True
   end
 end

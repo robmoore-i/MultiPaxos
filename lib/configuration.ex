@@ -5,8 +5,8 @@
 defmodule Configuration do
 
 def version 1 do	# configuration 1
-  %{ 
-  debug_level:  0, 	# debug level 
+  %{
+  debug_level:  0, 	# debug level
   docker_delay: 5_000,	# time (ms) to wait for containers to start up
 
   max_requests: 500,   	# max requests each client will make
@@ -15,19 +15,21 @@ def version 1 do	# configuration 1
   n_accounts:   100,	# number of active bank accounts
   max_amount:   1000,	# max amount moved between accounts
 
-  print_after:  1_000	# print transaction log summary every print_after msecs
+  print_after:  1_000,	# print transaction log summary every print_after msecs
 
-  # add your own here
+  # Added later
+  window: 5
   }
 end
 
-def version 2 do	# same as version 1 with higher debug level
+def version 2 do	# higher debug level
  config = version 1
  Map.put config, :debug_level, 1
 end
 
-def version 3 do	# configuration 3
+def version 3 do	# slower clients
+  config = version 1
+  %{config | max_requests: 3, client_sleep: 1000, client_stop: 5_000}
 end
 
 end # module -----------------------
-
