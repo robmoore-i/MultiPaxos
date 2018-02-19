@@ -7,19 +7,27 @@ defmodule Acceptor do
   end
 
   def loop(state) do
-    receive do
+    new_state = receive do
       { :accept_req, l, b } ->
-        if b > state[:bn] do
-          state = Map.put(state, :bn, b)
-        end
-        send l, { :accept_rsp, self(), state[:bn], state[:accepted] }
-        loop(state)
+        max_ballot = max_int(b, state[:bn])
+        send l, { :accept_rsp, self(), max_ballot, state[:accepted] }
+        Map.put(state, :bn, max_ballot)
       { :accepted_req, l, { b, slot, cmd }} ->
-        if b == bn do
-          state = Map.update!(state, :accepted, &([{b, slot, cmd} | &1]))
-        end
         send l, { :accepted_rsp, self(), state[:bn] }
-        loop(state)
+        if b == state[:bn] do
+          Map.update!(state, :accepted, &([{b, slot, cmd} | &1]))
+        else
+          state
+        end
+    end
+    loop(new_state)
+  end
+
+  def max_int(a, b) do
+    if a > b do
+      a
+    else
+      b
     end
   end
 end

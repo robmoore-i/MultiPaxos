@@ -13,7 +13,7 @@ defmodule Replica do
   def loop(state) do
     state = receive do
       { :client_request, cmd } ->
-        Map.put(state , :requests, [cmd | state[:requests])
+        Map.update!(state , :requests, &([cmd | &1]))
       { :decision, decision } ->
         process_decision(state, decision)
     end
@@ -32,12 +32,12 @@ defmodule Replica do
     if sn in Map.keys(decisions) do
       if sn in Map.keys(proposals) do
         if decisions[sn] != proposals[sn] do
-          Map.put(state, :requests, [proposals[sn] | state[:requests]])
+          state = Map.update!(state, :requests, &([proposals[sn] | &1]))
         end
         state = Map.put(state, :proposals, Map.delete(proposals, sn))
       end
       state = perform(state, decisions[sn])
-      unify(state, sn, state[:proposals], decisions) # Loop
+      unify(state) # Loop
     else
       state
     end
@@ -45,7 +45,7 @@ defmodule Replica do
 
   def perform(state, cmd) do
     decisions = state[:decisions]
-    if Enum.empty? Enum.filter(Map.keys decisions, &(state[:sn] > &1 and decisions[&1] == cmd and Cmd.is_reconfigure cmd)) do
+    if Enum.empty? Enum.filter(Map.keys(decisions), &(state[:sn] > &1 and decisions[&1] == cmd and Cmd.is_reconfigure cmd)) do
       _result = Cmd.execute(cmd, state[:db])
       # To send response back to client: ((( send Cmd.client(cmd), { :client_response, Cmd.id cmd, result } )))
     end
@@ -53,15 +53,14 @@ defmodule Replica do
   end
 
   def propose(state) do
-    window = state[:window]
-    pn     = state[:pn]
-    if pn < state[:sn] + window and not Enum.empty?(requests) do
-      earliest_cmd = decisions[pn - window]
+    pn = state[:pn]
+    if pn < state[:sn] + state[:window] and not Enum.empty?(state[:requests]) do
+      earliest_cmd = state[:decisions][pn - state[:window]]
       if Cmd.is_reconfigure earliest_cmd do
         state = Map.put(state, :leaders, Cmd.pull_new_leaders earliest_cmd)
       end
-      if not decisions.has_key?(pn) do
-        proposed = requests.first()
+      if not state[:decisions].has_key?(pn) do
+        proposed = state[:requests].first()
         state = Map.update!(state, :proposals, &Map.put(&1, pn, proposed))
         for l <- state[:leaders] do
           send l, { :propose, pn, proposed }

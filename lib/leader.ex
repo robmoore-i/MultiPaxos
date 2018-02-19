@@ -16,13 +16,13 @@ defmodule Leader do
         Map.put(state, :proposals, Map.put_new(state[:proposals], slot, cmd))
       { :adopted, bn, votes } ->
         new_proposals = merge_votes(state[:proposals], votes)
-        for {slot,cmd} in new_proposals do
+        for {slot, cmd} <- new_proposals do
           spawn(Commander, :start, [self(), state[:acceptors], state[:replicas], {state[:bn], slot, cmd}])
         end
         Map.put(Map.put(state, :active, true), :proposals, new_proposals)
       { :preempted, higher_bn } ->
         if higher_bn > state[:bn] do
-          new_state = %{state | active: true, bn: Ballot.inc(current_bn)}
+          new_state = %{state | active: true, bn: Ballot.inc(state[:bn])}
           spawn(Scout, :start, [self(), state[:acceptors], new_state[:bn]])
           new_state
         else
@@ -65,7 +65,7 @@ defmodule Leader do
   def preempt(pid, lid, higher_bn) do
     send lid, { :preempted, higher_bn }
     Process.exit(pid, :preempted)
-  state[:bn]  %{} # This function does not return
+    %{} # This function does not return
   end
 end
 
@@ -79,12 +79,12 @@ defmodule Scout do
   def loop(state) do
     state = receive do
       { :accept_rsp, aid, b, votes } ->
-        if b == bn do
-          state = Map.put(state, :votes,     state[:votes] ++ votes)
-          state = Map.put(state, :acceptors, List.delete(acceptors, aid))
+        if b == state[:bn] do
+          state = Map.update!(state, :votes, &(&1 ++ votes))
+          state = Map.update!(state, :acceptors, &List.delete(&1, aid))
           if Leader.quorum(state) do
             send state[:lid], { :adopted, b, votes }
-            Process.exit(:adopted)
+            Process.exit(self(), :adopted)
           end
           state
         else
@@ -98,7 +98,7 @@ end
 defmodule Commander do
   def start(lid, acceptors, replicas, {bn, slot, cmd}) do
     state = %{leader: lid, acceptors: acceptors, bn: bn, slot: slot, cmd: cmd, waiting_for: acceptors, votes: []}
-    for a in acceptors, do: send a, { :accepted_req, self(), bn }
+    for a <- acceptors, do: send a, { :accepted_req, self(), bn }
     loop(state)
   end
 
@@ -106,10 +106,10 @@ defmodule Commander do
     state = receive do
       { :accepted_rsp, aid, b } ->
         if b == state[:bn] do
-          state = Map.put(state, :acceptors, List.delete(acceptors, aid))
+          state = Map.update!(state, :acceptors, &List.delete(&1, aid))
           if Leader.quorum(state) do
             for r <- state[:replicas], do: send r, { :decided, {state[:slot], state[:cmd]}}
-            Process.exit(:decided)
+            Process.exit(self(), :decided)
           end
           state
         else
@@ -121,7 +121,8 @@ defmodule Commander do
 end
 
 defmodule Ballot do
-  # Ballots inherit ordering from the total ordering in elixir of integers and of pids.
+  # Ballots are tuples of {seq-num, pid}.
+  # They inherit ordering from the total ordering in elixir of integers and of pids.
 
   def init(pid) do
     {0, pid}
