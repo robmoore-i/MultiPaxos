@@ -52,9 +52,7 @@ def get_config do
   # add no. of servers and clients
   config = Map.put config, :n_servers, String.to_integer(Enum.at System.argv, 2)
   config = Map.put config, :n_clients, String.to_integer(Enum.at System.argv, 3)
-
-  IO.puts "There are #{config[:n_clients]} clients and #{config[:n_servers]} servers"
-
+  
   config
 end
 

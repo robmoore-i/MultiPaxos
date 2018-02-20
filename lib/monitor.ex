@@ -46,10 +46,15 @@ defp next config, clock, requests, updates, transactions do
   :print ->
     clock = clock + config.print_after
     sorted = updates |> Map.to_list |> List.keysort(0)
-    IO.puts "time = #{clock}  updates done = #{inspect sorted}"
-    sorted = requests |> Map.to_list |> List.keysort(0)
-    IO.puts "time = #{clock} requests seen = #{inspect sorted}"
-    IO.puts ""
+    # Prints the number of updates in the given tick.
+    {_s, c} = List.first sorted
+    IO.puts "#{c}"
+
+    if c >= config.max_requests * config.n_clients do
+      IO.puts "#{clock / 1000} seconds"
+      System.halt
+    end
+
     Process.send_after self(), :print, config.print_after
     next config, clock, requests, updates, transactions
 

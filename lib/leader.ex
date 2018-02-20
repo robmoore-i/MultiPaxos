@@ -3,12 +3,14 @@ defmodule Leader do
     IO.puts ["LEADER   (", Kernel.inspect(self()), "): ", msg]
   end
 
-  def start(_config) do
+  def start(config) do
     { acceptors, replicas } = receive do
       { :bind, acceptors, replicas } -> { acceptors, replicas }
     end
     state = %{acceptors: acceptors, replicas: replicas, active: false,
-              proposals: %{}, bn: Ballot.init(self()), backoff: 5}
+              proposals: %{}, bn: Ballot.init(self()),
+              backoff: config.backoff_initial, backoff_multiplier: config.backoff_multiplier,
+              backoff_reducer: config.backoff_reducer}
     backed_off_spawn(state, Scout, [self(), acceptors, state.bn])
     loop(state)
   end
@@ -86,13 +88,12 @@ defmodule Leader do
   end
 
   def inc_backoff(state) do
-    Map.update!(state, :backoff, &(round &1 * 1.2))
+    Map.update!(state, :backoff, &(round &1 * state.backoff_multiplier))
   end
 
   def dec_backoff(state) do
-    backoff_amount = 30
-    if state.backoff > backoff_amount do
-      Map.update!(state, :backoff, &(&1 - backoff_amount))
+    if state.backoff > state.backoff_reducer do
+      Map.update!(state, :backoff, &(&1 - state.backoff_reducer))
     else
       Map.put(state, :backoff, 1)
     end
