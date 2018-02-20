@@ -86,12 +86,13 @@ defmodule Leader do
   end
 
   def inc_backoff(state) do
-    Map.update!(state, :backoff, &(&1 * 2))
+    Map.update!(state, :backoff, &(round &1 * 1.2))
   end
 
   def dec_backoff(state) do
-    if state.backoff > 5 do
-      Map.update!(state, :backoff, &(&1 - 5))
+    backoff_amount = 30
+    if state.backoff > backoff_amount do
+      Map.update!(state, :backoff, &(&1 - backoff_amount))
     else
       Map.put(state, :backoff, 1)
     end
