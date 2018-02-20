@@ -9,8 +9,8 @@ defmodule Leader do
     end
     state = %{acceptors: acceptors, replicas: replicas, active: false,
               proposals: %{}, bn: Ballot.init(self()),
-              backoff: config.backoff_initial, backoff_multiplier: config.backoff_multiplier,
-              backoff_reducer: config.backoff_reducer}
+              backoff?: config.backoff?, backoff: config.backoff_initial,
+              backoff_multiplier: config.backoff_multiplier, backoff_reducer: config.backoff_reducer}
     backed_off_spawn(state, Scout, [self(), acceptors, state.bn])
     loop(state)
   end
@@ -73,7 +73,9 @@ defmodule Leader do
   ### minimum backoff is 1 (so that the MI can actually apply)
 
   def backed_off_spawn(state, component, args) do
-    Process.sleep(state.backoff)
+    if state.backoff? do
+      Process.sleep(state.backoff)
+    end
     pid = case component do
       Scout ->
         spawn(Scout, :start, args)
@@ -88,14 +90,22 @@ defmodule Leader do
   end
 
   def inc_backoff(state) do
-    Map.update!(state, :backoff, &(round &1 * state.backoff_multiplier))
+    if state.backoff? do
+      Map.update!(state, :backoff, &(round &1 * state.backoff_multiplier))
+    else
+      state
+    end
   end
 
   def dec_backoff(state) do
-    if state.backoff > state.backoff_reducer do
-      Map.update!(state, :backoff, &(&1 - state.backoff_reducer))
+    if state.backoff? do
+      if state.backoff > state.backoff_reducer do
+        Map.update!(state, :backoff, &(&1 - state.backoff_reducer))
+      else
+        Map.put(state, :backoff, 1)
+      end
     else
-      Map.put(state, :backoff, 1)
+      state
     end
   end
 
