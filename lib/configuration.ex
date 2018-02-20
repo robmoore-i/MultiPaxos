@@ -17,12 +17,11 @@ def version 1 do	# configuration 1
 
   print_after:  1_000,	# print transaction log summary every print_after msecs
 
-  # Added later
+  # Liveness parameters
   window: 5,
-
   backoff_initial: 0,
-  backoff_multiplier: 1.2,
-  backoff_reducer: 30
+  backoff_multiplier: 1,
+  backoff_reducer: 0
   }
 end
 
