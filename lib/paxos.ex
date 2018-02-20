@@ -9,7 +9,7 @@ def main do
 
   # Meta data regarding experimental run through.
   IO.puts "nClients,nServers,printAfter,maxRequests,window,backoffInitial,backoffMultiplier,backoffReducer"
-  IO.puts ["#{config.n_clients},#{config.n_servers},#{config.print_after},#{config.max_requests},#{config.window}#{config.backoff_initial},#{config.backoff_multiplier},#{config.backoff_reducer}"]
+  IO.puts ["#{config.n_clients},#{config.n_servers},#{config.print_after},#{config.max_requests},#{config.window},#{config.backoff_initial},#{config.backoff_multiplier},#{config.backoff_reducer}"]
   IO.puts "ticked updates:"
   IO.puts "0"
 

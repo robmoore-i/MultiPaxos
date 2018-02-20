@@ -9,7 +9,7 @@ defmodule Leader do
     end
     state = %{acceptors: acceptors, replicas: replicas, active: false,
               proposals: %{}, bn: Ballot.init(self()),
-              backoff?: config.backoff?, backoff: config.backoff_initial,
+              full_backoff?: config.full_backoff?, backoff: config.backoff_initial,
               backoff_multiplier: config.backoff_multiplier, backoff_reducer: config.backoff_reducer}
     backed_off_spawn(state, Scout, [self(), acceptors, state.bn])
     loop(state)
@@ -33,6 +33,9 @@ defmodule Leader do
         end
         dec_backoff %{state | active: true, proposals: new_proposals}
       { :preempted, higher_bn } ->
+        if not state.full_backoff? do
+          Process.sleep(state.backoff)
+        end
         if higher_bn > state.bn do
           new_state = inc_backoff %{state | active: true, bn: Ballot.inc(state.bn)}
           backed_off_spawn(state, Scout, [self(), state.acceptors, new_state.bn])
@@ -73,7 +76,7 @@ defmodule Leader do
   ### minimum backoff is 1 (so that the MI can actually apply)
 
   def backed_off_spawn(state, component, args) do
-    if state.backoff? do
+    if state.full_backoff? do
       Process.sleep(state.backoff)
     end
     pid = case component do
@@ -90,7 +93,7 @@ defmodule Leader do
   end
 
   def inc_backoff(state) do
-    if state.backoff? do
+    if state.full_backoff? do
       Map.update!(state, :backoff, &(round &1 * state.backoff_multiplier))
     else
       state
@@ -98,7 +101,7 @@ defmodule Leader do
   end
 
   def dec_backoff(state) do
-    if state.backoff? do
+    if state.full_backoff? do
       if state.backoff > state.backoff_reducer do
         Map.update!(state, :backoff, &(&1 - state.backoff_reducer))
       else
