@@ -1,4 +1,4 @@
-// Experiment utility
+// Experiment utility for quickly characterising results.
 
 parseConfig:{[fh]("JJJJJJFJ"; enlist ",") 0: 2#read0 fh}
 parseTotalTime:{[fh]"J"$first "." vs first -2#read0 fh}
