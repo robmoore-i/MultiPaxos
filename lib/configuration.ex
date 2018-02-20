@@ -19,8 +19,6 @@ def version 1 do	# configuration 1
 
   # Liveness parameters
   window: 5,
-  full_backoff?: false,
-  backoff_initial: 0,
   backoff_multiplier: 2,
   backoff_reducer: 8
   }

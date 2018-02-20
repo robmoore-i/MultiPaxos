@@ -1,6 +1,6 @@
 // Experiment utility for quickly characterising results.
 
-parseConfig:{[fh]("JJJJJJFJ"; enlist ",") 0: 2#read0 fh}
+parseConfig:{[fh]("JJJJJFJ"; enlist ",") 0: 2#read0 fh}
 parseTotalTime:{[fh]"J"$first "." vs first -2#read0 fh}
 parseTimes:{[fh]"J"$-2_3_read0 fh}
 parseNote:{[fh]raze last read0 fh}
