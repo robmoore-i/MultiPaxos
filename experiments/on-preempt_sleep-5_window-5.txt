@@ -1,0 +1,10 @@
+nClients,nServers,printAfter,maxRequests,window,backoffInitial,backoffMultiplier,backoffReducer
+2,3,1000,500,55,1,0
+ticked updates:
+0
+323
+656
+989
+1000
+4.0 seconds
+No full backoff. Leader sleeps 5ms every time it is preempted.
