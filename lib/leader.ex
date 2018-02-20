@@ -93,22 +93,14 @@ defmodule Leader do
   end
 
   def inc_backoff(state) do
-    if state.full_backoff? do
       Map.update!(state, :backoff, &(round &1 * state.backoff_multiplier))
-    else
-      state
-    end
   end
 
   def dec_backoff(state) do
-    if state.full_backoff? do
-      if state.backoff > state.backoff_reducer do
-        Map.update!(state, :backoff, &(&1 - state.backoff_reducer))
-      else
-        Map.put(state, :backoff, 1)
-      end
+    if state.backoff > state.backoff_reducer do
+      Map.update!(state, :backoff, &(&1 - state.backoff_reducer))
     else
-      state
+      Map.put(state, :backoff, 1)
     end
   end
 

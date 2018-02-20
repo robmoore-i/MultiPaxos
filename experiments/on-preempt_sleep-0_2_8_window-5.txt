@@ -1,0 +1,9 @@
+nClients,nServers,printAfter,maxRequests,window,backoffInitial,backoffMultiplier,backoffReducer
+2,3,1000,500,5,0,2,8
+ticked updates:
+0
+322
+655
+989
+1000
+4.0 seconds
