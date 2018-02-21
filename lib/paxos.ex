@@ -9,9 +9,8 @@ def main do
 
   # Meta data regarding experimental run through.
   IO.puts "nClients,nServers,printAfter,maxRequests,window"
-  IO.puts "#{config.n_clients},#{config.n_servers},#{config.print_after},#{config.max_requests},#{config.window}"
-  IO.puts "ticked updates:"
-  IO.puts "0"
+  IO.puts "#{config.n_clients},       #{config.n_servers},       #{config.print_after},      #{config.max_requests},        #{config.window}"
+  IO.puts ""
 
   if config.debug_level >= 2, do: IO.inspect config
   if config.setup == :docker, do: Process.sleep config.docker_delay

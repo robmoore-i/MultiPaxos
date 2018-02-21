@@ -38,7 +38,7 @@ defp next config, clock, requests, updates, transactions do
     updates = Map.put updates, db, seqnum
 
     if seqnum >= config.max_requests * config.n_clients do
-      IO.puts "#{(:os.system_time(:millisecond) - config.start_time) / 1000} seconds"
+      IO.puts "DONE(#{:os.system_time(:millisecond) - config.start_time})"
       System.halt
     end
 
@@ -52,10 +52,7 @@ defp next config, clock, requests, updates, transactions do
   :print ->
     clock = clock + config.print_after
     sorted = updates |> Map.to_list |> List.keysort(0)
-    IO.puts "time = #{clock}  updates done = #{inspect sorted}"
-    sorted = requests |> Map.to_list |> List.keysort(0)
-    IO.puts "time = #{clock} requests seen = #{inspect sorted}"
-    IO.puts ""
+    IO.puts "TICK(#{clock}):#{inspect sorted}"
     Process.send_after self(), :print, config.print_after
     next config, clock, requests, updates, transactions
 

@@ -17,7 +17,6 @@ defmodule Replica do
   def loop(state) do
     state = receive do
       { :client_request, cmd } ->
-        # There are lots of these: log "Client request"
         Map.update!(state , :requests, &([cmd | &1]))
       { :decision, decision } ->
         process_decision(state, decision)
