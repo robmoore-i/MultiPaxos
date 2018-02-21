@@ -9,7 +9,7 @@ defmodule Leader do
     end
     state = %{acceptors: acceptors, replicas: replicas, active: false,
               proposals: %{}, bn: Ballot.init(self()), backoff: 0,
-              backoff_multiplier: config.backoff_multiplier, backoff_reducer: config.backoff_reducer}
+              backoff_inc: config.backoff_inc, backoff_dec: config.backoff_dec}
     spawn(Scout, :start, [self(), acceptors, state.bn])
     loop(state)
   end
@@ -73,15 +73,11 @@ defmodule Leader do
   ### minimum backoff is 1 (so that the MI can actually apply)
 
   def inc_backoff(state) do
-      Map.update!(state, :backoff, &(round &1 * state.backoff_multiplier))
+    Map.update!(state, :backoff, state.backoff_inc)
   end
 
   def dec_backoff(state) do
-    if state.backoff > state.backoff_reducer do
-      Map.update!(state, :backoff, &(&1 - state.backoff_reducer))
-    else
-      Map.put(state, :backoff, 1)
-    end
+    Map.update!(state, :backoff, state.backoff_dec)
   end
 
   ### Some functions used by the subprocesses

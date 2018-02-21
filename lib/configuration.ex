@@ -18,9 +18,9 @@ def version 1 do	# configuration 1
   print_after:  1_000,	# print transaction log summary every print_after msecs
 
   # Liveness parameters
-  window: 5,
-  backoff_multiplier: 2,
-  backoff_reducer: 8
+  backoff_inc: fn b -> b + 1 end,
+  backoff_dec: fn b -> round b / 2 end,
+  window: 5
   }
 end
 
