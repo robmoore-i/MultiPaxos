@@ -8,8 +8,8 @@ def main do
   config = DAC.get_config
 
   # Meta data regarding experimental run through.
-  IO.puts "nClients,nServers,printAfter,maxRequests,window,backoffInc,backoffDec"
-  IO.puts ["#{config.n_clients},#{config.n_servers},#{config.print_after},#{config.max_requests},#{config.window},",inspect(config.backoff_inc),",",inspect(config.backoff_dec)]
+  IO.puts "nClients,nServers,printAfter,maxRequests,window"
+  IO.puts "#{config.n_clients},#{config.n_servers},#{config.print_after},#{config.max_requests},#{config.window}"
   IO.puts "ticked updates:"
   IO.puts "0"
 

@@ -29,9 +29,4 @@ def version 2 do	# higher debug level
  Map.put config, :debug_level, 1
 end
 
-def version 3 do	# slower clients
-  config = version 1
-  %{config | max_requests: 3, client_sleep: 1000, client_stop: 5_000}
-end
-
 end # module -----------------------
