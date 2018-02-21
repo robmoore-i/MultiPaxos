@@ -6,12 +6,12 @@ defmodule Monitor do
 
 def start config do
   Process.send_after self(), :print, config.print_after
-  next Map.put(config, :start_time, :os.system_time(:millisecond)), 0, Map.new, Map.new, Map.new
+  next Map.merge(config, %{start_time: :os.system_time(:millisecond), remaining_dbs: config.n_servers}), 0, Map.new, Map.new, Map.new
 end # start
 
 defp next config, clock, requests, updates, transactions do
   receive do
-  { :db_update, db, seqnum, transaction } ->
+  { :db_update, db, seqnum, transaction, db_pid } ->
     { :move, amount, from, to } = transaction
 
     done = Map.get updates, db, 0
@@ -38,11 +38,20 @@ defp next config, clock, requests, updates, transactions do
     updates = Map.put updates, db, seqnum
 
     if seqnum >= config.max_requests * config.n_clients do
-      IO.puts "DONE(#{:os.system_time(:millisecond) - config.start_time})"
-      System.halt
+      IO.puts "DB-#{db}.DONE(#{:os.system_time(:millisecond) - config.start_time})"
+      send db_pid, { :account_summary }
+      receive do
+        { :account_summary, ^db_pid, balances } -> IO.puts ["Balances in ", inspect(db), ": ", inspect balances]
+      end
+      new_remaining_dbs = config.remaining_dbs - 1
+      if new_remaining_dbs == 0 do
+        System.halt
+      else
+        next %{config | remaining_dbs: new_remaining_dbs}, clock, requests, updates, transactions
+      end
+    else
+      next config, clock, requests, updates, transactions
     end
-
-    next config, clock, requests, updates, transactions
 
   { :client_request, server_num } ->  # requests by replica
     seen = Map.get requests, server_num, 0
