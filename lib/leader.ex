@@ -9,7 +9,8 @@ defmodule Leader do
     end
     state = %{acceptors: acceptors, replicas: replicas, active: false,
               proposals: %{}, bn: Ballot.init(self()), backoff: 0,
-              backoff_inc: config.backoff_inc, backoff_dec: config.backoff_dec}
+              backoff_inc: config.backoff_inc, backoff_dec: config.backoff_dec,
+              total_sleep_time: 0}
     spawn(Scout, :start, [self(), acceptors, state.bn])
     loop(state)
   end
@@ -30,15 +31,16 @@ defmodule Leader do
         for {slot, cmd} <- new_proposals do
           spawn(Commander, :start, [self(), state.acceptors, state.replicas, {bn, slot, cmd}])
         end
-        decrease_backoff %{state | active: true, proposals: new_proposals}
+        decrease_backoff  %{state | active: true, proposals: new_proposals}
       { :preempted, higher_bn } ->
         Process.sleep(state.backoff)
+        incremented_sleep_time = state.total_sleep_time + state.backoff
         if higher_bn > state.bn do
           incremented_bn = Ballot.inc(state.bn)
           spawn(Scout, :start, [self(), state.acceptors, incremented_bn])
-          increase_backoff %{state | active: true, bn: incremented_bn}
+          increase_backoff %{state | active: true, bn: incremented_bn, total_sleep_time: incremented_sleep_time}
         else
-          state
+          %{state | total_sleep_time: incremented_sleep_time}
         end
     end
     loop(state)

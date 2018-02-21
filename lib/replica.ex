@@ -55,7 +55,7 @@ defmodule Replica do
       _result = Cmd.execute(cmd, state.db)
       # To send response back to client: ((( send Cmd.client(cmd), { :client_response, Cmd.id cmd, result } )))
     else
-      log "Reconfiguration branch entered erroneously: Replica.perform"
+      log "Reconfiguration branch entered erroneously in Replica.perform"
       System.halt
     end
     Map.update!(state, :sn, &(&1 + 1))
@@ -67,7 +67,7 @@ defmodule Replica do
       if Cmd.is_reconfigure(state.decisions[pn - state.window]) do
         # Add leaders using reconfiguration:
         #   state = Map.put(state, :leaders, Cmd.pull_new_leaders state.decisions[pn - state.window])
-        log "Reconfiguration branch entered erroneously: Replica.propose"
+        log "Reconfiguration branch entered erroneously in Replica.propose"
         System.halt
       end
       state =

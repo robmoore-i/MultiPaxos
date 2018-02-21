@@ -14,21 +14,23 @@ end
 
 def version 1 do	# configuration 1
   %{
-  debug_level:  0, 	# debug level
+  debug_level:  0, 	    # debug level
   docker_delay: 5_000,	# time (ms) to wait for containers to start up
-
-  max_requests: 500,   	# max requests each client will make
-  client_sleep: 5,	# time (ms) to sleep before sending new request
+  max_requests: 500,  	# max requests each client will make
+  client_sleep: 5,	    # time (ms) to sleep before sending new request
   client_stop:  10_000,	# time (ms) to stop sending further requests
-  n_accounts:   100,	# number of active bank accounts
-  max_amount:   1000,	# max amount moved between accounts
-
+  n_accounts:   100,	  # number of active bank accounts
+  max_amount:   1000,	  # max amount moved between accounts
   print_after:  1_000,	# print transaction log summary every print_after msecs
 
   # Liveness parameters
   backoff_inc: fn b -> b + 1 end,
-  backoff_dec: f_div(2.1),
-  window: 5
+  backoff_dec: f_minus(1),
+  window: 5,
+
+  # So I don't have to change files too often during local testing
+  n_servers: 3,
+  n_clients: 2
   }
 end
 
