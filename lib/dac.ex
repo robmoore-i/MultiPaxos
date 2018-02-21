@@ -1,3 +1,4 @@
+# Robert Moore (rrm115) Inusha Hapuarachchi (ih1115)
 
 # distributed algorithms, n.dulay, 25 jan 18
 # helper functions v2
@@ -52,7 +53,7 @@ def get_config do
   # add no. of servers and clients
   config = Map.put config, :n_servers, String.to_integer(Enum.at System.argv, 2)
   config = Map.put config, :n_clients, String.to_integer(Enum.at System.argv, 3)
-  
+
   config
 end
 

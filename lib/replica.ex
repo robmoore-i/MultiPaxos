@@ -1,3 +1,5 @@
+# Robert Moore (rrm115) Inusha Hapuarachchi (ih1115)
+
 defmodule Replica do
   def log(msg) do
     IO.puts ["REPLICA  (", Kernel.inspect(self()), "): ", msg]

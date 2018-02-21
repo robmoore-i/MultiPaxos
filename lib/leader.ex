@@ -1,3 +1,5 @@
+# Robert Moore (rrm115) Inusha Hapuarachchi (ih1115)
+
 defmodule Leader do
   def log(msg) do
     IO.puts ["LEADER   (", Kernel.inspect(self()), "): ", msg]

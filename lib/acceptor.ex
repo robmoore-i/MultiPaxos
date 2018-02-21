@@ -1,3 +1,5 @@
+# Robert Moore (rrm115) Inusha Hapuarachchi (ih1115)
+
 defmodule Acceptor do
   def log(msg) do
     IO.puts ["ACCEPTOR (", Kernel.inspect(self()), "): ", msg]
