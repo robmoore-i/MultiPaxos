@@ -10,7 +10,7 @@ defmodule Leader do
       { :bind, acceptors, replicas } -> { acceptors, replicas }
     end
     state = %{acceptors: acceptors, replicas: replicas, active: false,
-              proposals: %{}, bn: Ballot.init(self()), backoff: 0,
+              proposals: %{}, bn: Ballot.init(self()), backoff: :rand.uniform(100),
               backoff_inc: config.backoff_inc, backoff_dec: config.backoff_dec,
               total_sleep_time: 0}
     spawn(Scout, :start, [self(), acceptors, state.bn])

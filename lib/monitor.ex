@@ -7,7 +7,9 @@ defmodule Monitor do
 
 def start config do
   Process.send_after self(), :print, config.print_after
-  next Map.merge(config, %{start_time: :os.system_time(:millisecond), remaining_dbs: config.n_servers}), 0, Map.new, Map.new, Map.new
+  extra_config = %{start_time: :os.system_time(:millisecond),
+                   remaining_dbs: config.n_servers, final_accounts: []}
+  next Map.merge(config, extra_config), 0, Map.new, Map.new, Map.new
 end # start
 
 defp next config, clock, requests, updates, transactions do
@@ -41,14 +43,25 @@ defp next config, clock, requests, updates, transactions do
     if seqnum >= config.max_requests * config.n_clients do
       IO.puts "DB-#{db}.DONE(#{:os.system_time(:millisecond) - config.start_time})"
       send db_pid, { :account_summary }
-      receive do
-        { :account_summary, ^db_pid, balances } -> IO.puts ["Balances in ", inspect(db), ": ", inspect balances]
+      balances = receive do
+        { :account_summary, ^db_pid, balances } -> balances
+      end
+      for seen_final_ledger <- config.final_accounts do
+        if balances != seen_final_ledger do
+          IO.puts "Final ledgers do not match!"
+          IO.puts "   Expected"
+          IO.puts inspect(seen_final_ledger)
+          IO.puts "   Actual"
+          IO.puts inspect(balances)
+          System.halt
+        end
       end
       new_remaining_dbs = config.remaining_dbs - 1
       if new_remaining_dbs == 0 do
         System.halt
       else
-        next %{config | remaining_dbs: new_remaining_dbs}, clock, requests, updates, transactions
+        updated_config = %{config | remaining_dbs: new_remaining_dbs, final_accounts: [balances | config.final_accounts]}
+        next updated_config, clock, requests, updates, transactions
       end
     else
       next config, clock, requests, updates, transactions
