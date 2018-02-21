@@ -69,9 +69,6 @@ defmodule Leader do
       end)
   end
 
-  ### Implements a multiplicative increase, additive decrease backoff (MIAD)
-  ### minimum backoff is 1 (so that the MI can actually apply)
-
   def inc_backoff(state) do
     Map.update!(state, :backoff, state.backoff_inc)
   end
