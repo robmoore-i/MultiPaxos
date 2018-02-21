@@ -4,6 +4,14 @@
 
 defmodule Configuration do
 
+def f_minus(n) do
+  fn b -> max(0, b - n) end
+end
+
+def f_div(n) do
+  fn b -> round(b / n) end
+end
+
 def version 1 do	# configuration 1
   %{
   debug_level:  0, 	# debug level
@@ -19,7 +27,7 @@ def version 1 do	# configuration 1
 
   # Liveness parameters
   backoff_inc: fn b -> b + 1 end,
-  backoff_dec: fn b -> round b / 2 end,
+  backoff_dec: f_div(2.1),
   window: 5
   }
 end

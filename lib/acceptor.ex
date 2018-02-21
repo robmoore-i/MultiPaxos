@@ -13,7 +13,7 @@ defmodule Acceptor do
   def loop(state) do
     new_state = receive do
       { :accept_req, l, b } ->
-        max_ballot = max_int(b, state.bn)
+        max_ballot = max(b, state.bn)
         send l, { :accept_rsp, self(), max_ballot, state.accepted }
         Map.put(state, :bn, max_ballot)
       { :accepted_req, l, { b, slot, cmd }} ->
@@ -25,14 +25,5 @@ defmodule Acceptor do
         end
     end
     loop(new_state)
-  end
-
-  # kmt
-  def max_int(a, b) do
-    if a > b do
-      a
-    else
-      b
-    end
   end
 end

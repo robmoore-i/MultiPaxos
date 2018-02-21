@@ -30,13 +30,13 @@ defmodule Leader do
         for {slot, cmd} <- new_proposals do
           spawn(Commander, :start, [self(), state.acceptors, state.replicas, {bn, slot, cmd}])
         end
-        dec_backoff %{state | active: true, proposals: new_proposals}
+        decrease_backoff %{state | active: true, proposals: new_proposals}
       { :preempted, higher_bn } ->
         Process.sleep(state.backoff)
         if higher_bn > state.bn do
           incremented_bn = Ballot.inc(state.bn)
           spawn(Scout, :start, [self(), state.acceptors, incremented_bn])
-          inc_backoff %{state | active: true, bn: incremented_bn}
+          increase_backoff %{state | active: true, bn: incremented_bn}
         else
           state
         end
@@ -69,11 +69,13 @@ defmodule Leader do
       end)
   end
 
-  def inc_backoff(state) do
+  ### Backoff management
+
+  def increase_backoff(state) do
     Map.update!(state, :backoff, state.backoff_inc)
   end
 
-  def dec_backoff(state) do
+  def decrease_backoff(state) do
     Map.update!(state, :backoff, state.backoff_dec)
   end
 

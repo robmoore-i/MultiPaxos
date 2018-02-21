@@ -6,7 +6,7 @@ defmodule Monitor do
 
 def start config do
   Process.send_after self(), :print, config.print_after
-  next config, 0, Map.new, Map.new, Map.new
+  next Map.put(config, :start_time, :os.system_time(:millisecond)), 0, Map.new, Map.new, Map.new
 end # start
 
 defp next config, clock, requests, updates, transactions do
@@ -36,6 +36,12 @@ defp next config, clock, requests, updates, transactions do
       end # case
 
     updates = Map.put updates, db, seqnum
+
+    if seqnum >= config.max_requests * config.n_clients do
+      IO.puts "#{(:os.system_time(:millisecond) - config.start_time) / 1000} seconds"
+      System.halt
+    end
+
     next config, clock, requests, updates, transactions
 
   { :client_request, server_num } ->  # requests by replica
@@ -46,15 +52,10 @@ defp next config, clock, requests, updates, transactions do
   :print ->
     clock = clock + config.print_after
     sorted = updates |> Map.to_list |> List.keysort(0)
-    # Prints the number of updates in the given tick.
-    {_s, c} = List.first sorted
-    IO.puts "#{c}"
-
-    if c >= config.max_requests * config.n_clients do
-      IO.puts "#{clock / 1000} seconds"
-      System.halt
-    end
-
+    IO.puts "time = #{clock}  updates done = #{inspect sorted}"
+    sorted = requests |> Map.to_list |> List.keysort(0)
+    IO.puts "time = #{clock} requests seen = #{inspect sorted}"
+    IO.puts ""
     Process.send_after self(), :print, config.print_after
     next config, clock, requests, updates, transactions
 
